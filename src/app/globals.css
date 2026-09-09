@@ -1,0 +1,109 @@
+@import "tailwindcss";
+
+@theme {
+  --color-ink-50: #f5f7f8;
+  --color-ink-100: #e6eaed;
+  --color-ink-200: #ccd4da;
+  --color-ink-300: #a4b2bc;
+  --color-ink-400: #74889a;
+  --color-ink-500: #566c7e;
+  --color-ink-600: #43566a;
+  --color-ink-700: #384656;
+  --color-ink-800: #2c3745;
+  --color-ink-900: #1b2430;
+  --color-ink-950: #101821;
+
+  --color-brand-50: #eefbf5;
+  --color-brand-100: #d5f5e6;
+  --color-brand-200: #aeead0;
+  --color-brand-300: #78d8b3;
+  --color-brand-400: #43be92;
+  --color-brand-500: #1fa377;
+  --color-brand-600: #12835f;
+  --color-brand-700: #10684e;
+  --color-brand-800: #11533f;
+  --color-brand-900: #0f4436;
+  --color-brand-950: #04261d;
+
+  --color-gold-400: #f2b544;
+  --color-gold-500: #e09b1c;
+  --color-gold-600: #b87914;
+
+  --font-sans: var(--font-inter), var(--font-bangla), system-ui, sans-serif;
+  --font-bn: var(--font-bangla), var(--font-inter), system-ui, sans-serif;
+
+  --radius-xl2: 1.25rem;
+}
+
+:root {
+  color-scheme: light;
+  --page: #f7f8f9;
+  --card: #ffffff;
+  --line: #e6eaed;
+  --text: #101821;
+  --muted: #566c7e;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    color-scheme: dark;
+    --page: #0c1219;
+    --card: #141d27;
+    --line: #22303d;
+    --text: #eef2f5;
+    --muted: #9fb0bd;
+  }
+}
+
+* {
+  border-color: var(--line);
+}
+
+body {
+  background: var(--page);
+  color: var(--text);
+  -webkit-tap-highlight-color: transparent;
+}
+
+.card {
+  background: var(--card);
+  border: 1px solid var(--line);
+}
+
+.muted {
+  color: var(--muted);
+}
+
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+@keyframes fade-up {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+.fade-up {
+  animation: fade-up 0.25s ease-out both;
+}
+
+input,
+select,
+textarea {
+  background: var(--card);
+  color: var(--text);
+}
+
+input::placeholder,
+textarea::placeholder {
+  color: var(--muted);
+}

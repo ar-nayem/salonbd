@@ -1,0 +1,414 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+// ---------------- Users & auth ----------------
+
+enum Role {
+  CUSTOMER
+  OWNER
+  ADMIN
+}
+
+model User {
+  id           String   @id @default(cuid())
+  name         String
+  email        String?  @unique
+  phone        String?  @unique
+  passwordHash String?
+  googleId     String?  @unique
+  avatarUrl    String?
+  role         Role     @default(CUSTOMER)
+  locale       String   @default("bn")
+  isBlocked    Boolean  @default(false)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  shops         Shop[]
+  bookings      Booking[]
+  reviews       Review[]
+  favorites     Favorite[]
+  notifications Notification[]
+  redemptions   PromoRedemption[]
+  staffProfile  Staff?
+}
+
+// ---------------- Shops ----------------
+
+model Shop {
+  id          String  @id @default(cuid())
+  ownerId     String
+  owner       User    @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  name        String
+  nameBn      String?
+  slug        String  @unique
+  about       String?
+  aboutBn     String?
+  phone       String
+  address     String
+  area        String
+  city        String
+  district    String
+  lat         Float?
+  lng         Float?
+  coverUrl    String?
+  shopType    String  @default("UNISEX") // MEN | WOMEN | UNISEX
+  isActive    Boolean @default(true)
+  isVerified  Boolean @default(false)
+  acceptsCash Boolean @default(true)
+  acceptsOnline Boolean @default(false)
+  // deposit percent required when booking online (0 = full amount on site)
+  depositPercent Int    @default(0)
+  commissionRate Float  @default(0.10)
+  ratingAvg   Float   @default(0)
+  reviewCount Int     @default(0)
+  bookingCount Int    @default(0)
+  slotStepMin Int     @default(15)
+  queueEnabled Boolean @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  services     Service[]
+  staff        Staff[]
+  hours        WorkingHour[]
+  closures     Closure[]
+  bookings     Booking[]
+  reviews      Review[]
+  images       ShopImage[]
+  favorites    Favorite[]
+  promos       Promo[]
+  queueTokens  QueueToken[]
+  payouts      Payout[]
+
+  @@index([area])
+  @@index([city])
+  @@index([isActive, isVerified])
+}
+
+model ShopImage {
+  id     String @id @default(cuid())
+  shopId String
+  shop   Shop   @relation(fields: [shopId], references: [id], onDelete: Cascade)
+  url    String
+  caption String?
+  sort   Int    @default(0)
+}
+
+model Service {
+  id          String  @id @default(cuid())
+  shopId      String
+  shop        Shop    @relation(fields: [shopId], references: [id], onDelete: Cascade)
+  name        String
+  nameBn      String?
+  category    String  @default("HAIR")
+  description String?
+  durationMin Int     @default(30)
+  price       Int     // BDT, whole taka
+  imageUrl    String?
+  isActive    Boolean @default(true)
+  sort        Int     @default(0)
+  createdAt   DateTime @default(now())
+
+  staff        StaffService[]
+  bookingItems BookingItem[]
+
+  @@index([shopId, isActive])
+}
+
+model Staff {
+  id          String  @id @default(cuid())
+  shopId      String
+  shop        Shop    @relation(fields: [shopId], references: [id], onDelete: Cascade)
+  userId      String? @unique
+  user        User?   @relation(fields: [userId], references: [id])
+  name        String
+  title       String?
+  bio         String?
+  avatarUrl   String?
+  isActive    Boolean @default(true)
+  ratingAvg   Float   @default(0)
+  reviewCount Int     @default(0)
+  sort        Int     @default(0)
+  createdAt   DateTime @default(now())
+
+  services StaffService[]
+  hours    WorkingHour[]
+  closures Closure[]
+  bookings Booking[]
+  reviews  Review[]
+  queueTokens QueueToken[]
+
+  @@index([shopId, isActive])
+}
+
+model StaffService {
+  staffId   String
+  serviceId String
+  staff     Staff   @relation(fields: [staffId], references: [id], onDelete: Cascade)
+  service   Service @relation(fields: [serviceId], references: [id], onDelete: Cascade)
+
+  @@id([staffId, serviceId])
+}
+
+// weekday 0=Sunday ... 6=Saturday. Row belongs to a shop, or to a staff member (override).
+model WorkingHour {
+  id       String  @id @default(cuid())
+  shopId   String?
+  shop     Shop?   @relation(fields: [shopId], references: [id], onDelete: Cascade)
+  staffId  String?
+  staff    Staff?  @relation(fields: [staffId], references: [id], onDelete: Cascade)
+  weekday  Int
+  openMin  Int     // minutes from midnight
+  closeMin Int
+  isClosed Boolean @default(false)
+
+  @@index([shopId, weekday])
+  @@index([staffId, weekday])
+}
+
+// One-off closure / holiday / leave
+model Closure {
+  id      String   @id @default(cuid())
+  shopId  String?
+  shop    Shop?    @relation(fields: [shopId], references: [id], onDelete: Cascade)
+  staffId String?
+  staff   Staff?   @relation(fields: [staffId], references: [id], onDelete: Cascade)
+  date    String   // yyyy-mm-dd
+  reason  String?
+  startMin Int?    // null = whole day
+  endMin   Int?
+
+  @@index([shopId, date])
+  @@index([staffId, date])
+}
+
+// ---------------- Bookings ----------------
+
+enum BookingStatus {
+  PENDING
+  CONFIRMED
+  COMPLETED
+  CANCELLED
+  NO_SHOW
+}
+
+enum PaymentMethod {
+  CASH
+  ONLINE
+}
+
+enum PaymentStatus {
+  UNPAID
+  DEPOSIT_PAID
+  PAID
+  REFUNDED
+  FAILED
+}
+
+model Booking {
+  id         String        @id @default(cuid())
+  code       String        @unique
+  customerId String
+  customer   User          @relation(fields: [customerId], references: [id])
+  shopId     String
+  shop       Shop          @relation(fields: [shopId], references: [id], onDelete: Cascade)
+  staffId    String?
+  staff      Staff?        @relation(fields: [staffId], references: [id])
+  date       String        // yyyy-mm-dd (Asia/Dhaka)
+  startMin   Int
+  endMin     Int
+  status     BookingStatus @default(PENDING)
+  customerName  String
+  customerPhone String
+  notes      String?
+
+  subtotal   Int
+  discount   Int           @default(0)
+  total      Int
+  promoId    String?
+  promo      Promo?        @relation(fields: [promoId], references: [id])
+
+  paymentMethod PaymentMethod @default(CASH)
+  paymentStatus PaymentStatus @default(UNPAID)
+  amountPaid    Int           @default(0)
+  dueAtShop     Int           @default(0)
+
+  cancelReason String?
+  cancelledBy  String?
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  items    BookingItem[]
+  payments Payment[]
+  review   Review?
+
+  @@index([shopId, date])
+  @@index([staffId, date])
+  @@index([customerId])
+  @@index([status])
+}
+
+model BookingItem {
+  id        String  @id @default(cuid())
+  bookingId String
+  booking   Booking @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+  serviceId String
+  service   Service @relation(fields: [serviceId], references: [id])
+  name      String
+  price     Int
+  durationMin Int
+}
+
+model Payment {
+  id         String        @id @default(cuid())
+  bookingId  String
+  booking    Booking       @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+  provider   String        // BKASH | NAGAD | SSLCOMMERZ | CASH | MOCK
+  amount     Int
+  status     String        @default("INITIATED") // INITIATED | SUCCESS | FAILED | REFUNDED
+  trxId      String?
+  reference  String?       @unique
+  payload    String?
+  createdAt  DateTime      @default(now())
+  updatedAt  DateTime      @updatedAt
+
+  @@index([bookingId])
+}
+
+// ---------------- Walk-in queue ----------------
+
+enum QueueStatus {
+  WAITING
+  SERVING
+  DONE
+  SKIPPED
+}
+
+model QueueToken {
+  id        String      @id @default(cuid())
+  shopId    String
+  shop      Shop        @relation(fields: [shopId], references: [id], onDelete: Cascade)
+  staffId   String?
+  staff     Staff?      @relation(fields: [staffId], references: [id])
+  date      String
+  number    Int
+  name      String
+  phone     String?
+  status    QueueStatus @default(WAITING)
+  createdAt DateTime    @default(now())
+  servedAt  DateTime?
+
+  @@unique([shopId, date, number])
+  @@index([shopId, date, status])
+}
+
+// ---------------- Reviews ----------------
+
+model Review {
+  id        String   @id @default(cuid())
+  bookingId String   @unique
+  booking   Booking  @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+  customerId String
+  customer  User     @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  shopId    String
+  shop      Shop     @relation(fields: [shopId], references: [id], onDelete: Cascade)
+  staffId   String?
+  staff     Staff?   @relation(fields: [staffId], references: [id])
+  rating    Int
+  comment   String?
+  reply     String?
+  repliedAt DateTime?
+  isHidden  Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  @@index([shopId, isHidden])
+}
+
+// ---------------- Promos ----------------
+
+model Promo {
+  id           String   @id @default(cuid())
+  code         String   @unique
+  shopId       String?
+  shop         Shop?    @relation(fields: [shopId], references: [id], onDelete: Cascade)
+  type         String   @default("PERCENT") // PERCENT | FLAT
+  value        Int
+  minAmount    Int      @default(0)
+  maxDiscount  Int?
+  usageLimit   Int?
+  perUserLimit Int      @default(1)
+  usedCount    Int      @default(0)
+  startsAt     DateTime @default(now())
+  endsAt       DateTime?
+  isActive     Boolean  @default(true)
+  createdAt    DateTime @default(now())
+
+  bookings    Booking[]
+  redemptions PromoRedemption[]
+}
+
+model PromoRedemption {
+  id        String   @id @default(cuid())
+  promoId   String
+  promo     Promo    @relation(fields: [promoId], references: [id], onDelete: Cascade)
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  bookingId String
+  amount    Int
+  createdAt DateTime @default(now())
+
+  @@index([promoId, userId])
+}
+
+// ---------------- Misc ----------------
+
+model Favorite {
+  id     String @id @default(cuid())
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  shopId String
+  shop   Shop   @relation(fields: [shopId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+
+  @@unique([userId, shopId])
+}
+
+model Notification {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  title     String
+  body      String
+  href      String?
+  isRead    Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  @@index([userId, isRead])
+}
+
+model Payout {
+  id        String   @id @default(cuid())
+  shopId    String
+  shop      Shop     @relation(fields: [shopId], references: [id], onDelete: Cascade)
+  periodStart String
+  periodEnd   String
+  gross      Int
+  commission Int
+  net        Int
+  status     String  @default("PENDING") // PENDING | PAID
+  paidAt     DateTime?
+  note       String?
+  createdAt  DateTime @default(now())
+
+  @@index([shopId, status])
+}
+
+model Setting {
+  key   String @id
+  value String
+}
