@@ -1,5 +1,5 @@
 import { db } from "@/lib/db";
-import { requireOwnerShopId } from "@/lib/owner";
+import { requireShopPage } from "@/lib/tenancy";
 import { getT } from "@/lib/i18n";
 import { todayISO } from "@/lib/utils";
 import { Badge, Button, Card, Input, Label, Select } from "@/components/ui";
@@ -8,7 +8,7 @@ import { addQueueToken, setQueueStatus } from "../actions";
 export const dynamic = "force-dynamic";
 
 export default async function QueuePage() {
-  const { shopId } = await requireOwnerShopId();
+  const { shopId } = await requireShopPage();
   const { t } = await getT();
   const date = todayISO();
 

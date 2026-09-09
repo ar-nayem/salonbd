@@ -53,8 +53,10 @@ export default async function AdminUsers({
               <input type="hidden" name="id" value={u.id} />
               <Select name="role" defaultValue={u.role} className="h-9 w-32">
                 <option value="CUSTOMER">Customer</option>
+                <option value="STAFF">Shop staff</option>
                 <option value="OWNER">Owner</option>
                 <option value="ADMIN">Admin</option>
+                <option value="SUPER_ADMIN">Super admin</option>
               </Select>
               <Button size="sm" type="submit">
                 {t("common.save")}

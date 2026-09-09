@@ -1,5 +1,6 @@
 import { db } from "@/lib/db";
-import { requireOwnerShopId } from "@/lib/owner";
+import { PUBLIC_SERVICE_WHERE } from "@/lib/constants";
+import { requireShopPage } from "@/lib/tenancy";
 import { getT } from "@/lib/i18n";
 import { Badge, Button, Card, Input, Label, Textarea } from "@/components/ui";
 import { deleteStaff, saveStaff } from "../actions";
@@ -7,7 +8,7 @@ import { deleteStaff, saveStaff } from "../actions";
 export const dynamic = "force-dynamic";
 
 export default async function StaffPage() {
-  const { shopId } = await requireOwnerShopId();
+  const { shopId } = await requireShopPage();
   const { t } = await getT();
 
   const [staff, services] = await Promise.all([
@@ -16,7 +17,7 @@ export default async function StaffPage() {
       orderBy: [{ sort: "asc" }, { createdAt: "asc" }],
       include: { services: { select: { serviceId: true } } },
     }),
-    db.service.findMany({ where: { shopId, isActive: true }, orderBy: { name: "asc" } }),
+    db.service.findMany({ where: { shopId, ...PUBLIC_SERVICE_WHERE }, orderBy: { name: "asc" } }),
   ]);
 
   return (

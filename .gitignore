@@ -46,3 +46,6 @@ prisma/*.db
 prisma/*.db-journal
 
 !.env.example
+
+# uploaded files
+storage/

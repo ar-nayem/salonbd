@@ -7,6 +7,25 @@ admin verifies shops, sets commission and settles payouts.
 
 Bangla and English throughout (toggle in the header), mobile-first, installable as a PWA.
 
+## What is in it
+
+**Buyers** — search by area, service, rating or distance; shop pages with services,
+option groups, add-ons, team, gallery and reviews; a four-step booking flow; walk-in queue
+tokens; guest checkout with an account offered afterwards; live order tracking with a status
+timeline; per-booking messaging with the shop; reviews with photos, tags, per-service ratings and
+helpful votes.
+
+**Shops** — an operations board with one-step status advances, a wall display for the floor,
+a QR scanner for verifying bookings, printable QR codes for the shop, price list, chairs, services
+and promotions, chair management, a team roster with roles, catalog with option groups, add-ons,
+offer prices and real image uploads, hours and leave, walk-in queue, review replies, promo codes
+and earnings.
+
+**Platform admin** — shop approval queue and lifecycle, per-shop commission, user roles and
+blocking, sales analytics over 7/30/90 days, per-shop settlement and 12-month payout history,
+customer list with CSV export and masked phones, and age demographics from self-reported dates of
+birth.
+
 ## Stack
 
 - Next.js 16 (App Router, React 19, server actions) + TypeScript
@@ -64,6 +83,44 @@ Per shop, the owner chooses cash, online, or both, and an advance deposit percen
 full amount online). The remainder shows as "due at shop" and is settled when the shop marks the
 booking completed.
 
+## Decisions worth knowing
+
+**QR codes carry a token, nothing else.** A printed code encodes only `/q/<token>` with an
+opaque random token — never a database id, never PII, never the destination. One server-side
+resolver turns a token into a destination: it looks the code up, checks it is still active, logs
+the scan, bumps the counter, then redirects or renders. Chair codes pass the token onward
+(`?qr=<token>`), and both the page and the booking endpoint re-resolve the chair from it. Staff of
+that shop who scan a booking code get a verification panel; everyone else gets the buyer's own
+read-only view. Redirect URLs are built from `APP_URL`, never from the incoming request — behind a
+reverse proxy the request URL resolves to the internal bind address and every printed sticker would
+point at localhost.
+
+**One status map.** `src/lib/status.ts` owns the flow per fulfilment type and the "what comes
+next, and what should the button say" answer. The board, the QR verification panel and the API all
+read from it, and `advanceBooking()` refuses anything that is not exactly one step — a scan cannot
+jump a booking from "just accepted" to "finished". Every change is written as its own event row, so
+the buyer's timeline shows what happened rather than what the current status implies.
+
+**Tenancy is resolved from the session.** A shop id in a form or body is only ever used to pick
+between shops the caller already belongs to. A valid session on the wrong shop gets 404, not 403 —
+a 403 confirms the record exists. Messaging derives "who may open this thread" from the same
+function as "who may open this booking", so a second check cannot drift from the first.
+
+**Idempotent checkout.** The client mints one key when it reaches the payment step and reuses it
+across retries; the column is unique, and a duplicate submission returns the existing booking
+instead of creating a second one or erroring.
+
+**Money.** Analytics count only bookings that were actually paid. Commission is rounded per shop
+per period and only then summed, so the summary always equals the sum of its own rows. Date buckets
+are built from the local `yyyy-mm-dd` strings bookings are stored with, never from a UTC timestamp,
+and empty days are filled with zeroes. CSV exports are RFC 4180 quoted, so a comma in a name cannot
+shift every following column.
+
+**Placeholders say they are placeholders.** Email and SMS sit behind a one-method interface with
+a logging implementation that reports failure rather than silent success, so a one-time code is
+never followed by "check your inbox" when nothing was sent. The sandbox payment gateway is
+explicit about being one.
+
 ## How availability works
 
 `src/lib/availability.ts` builds each barber's open windows for a date from their own hours, or
@@ -77,15 +134,28 @@ back the loser when two customers submit the same slot at once.
 ## Project layout
 
 ```
-src/app                 routes: public, /bookings, /dashboard (owner), /admin
-src/app/dashboard/actions.ts  owner mutations (server actions)
+src/app                       public routes, /bookings, /dashboard (shop), /admin
+src/app/q/[token]             the one QR resolver
+src/app/dashboard/actions.ts  shop mutations (server actions)
 src/app/admin/actions.ts      admin mutations
-src/lib/availability.ts slot engine
-src/lib/booking.ts      booking creation, rating recompute
-src/lib/payments.ts     gateway abstraction + settlement
-src/lib/auth.ts         sessions, password hashing, guards
-src/lib/dictionaries.ts Bangla and English strings
-prisma/schema.prisma    data model
+src/middleware.ts             first-pass route protection for /dashboard and /admin
+src/lib/status.ts             the shared booking status map
+src/lib/booking-flow.ts       advance / cancel, one step at a time
+src/lib/availability.ts       slot engine
+src/lib/pricing.ts            server-side cart pricing (options and add-ons)
+src/lib/booking.ts            booking creation, idempotency, rating recompute
+src/lib/tenancy.ts            who may act on which shop
+src/lib/booking-access.ts     the single "who may see this booking" rule
+src/lib/qr.ts                 token creation, resolution, scan logging
+src/lib/payments.ts           gateway abstraction + settlement
+src/lib/notifications.ts      notification / email / SMS interfaces
+src/lib/otp.ts                one-time codes (hashed, rate limited)
+src/lib/uploads.ts            file storage outside the static tree
+src/lib/analytics.ts          paid-only aggregates, local date buckets
+src/lib/csv.ts                RFC 4180 export
+src/lib/dictionaries.ts       Bangla and English strings
+prisma/schema.prisma          data model
+storage/uploads               uploaded files (gitignored)
 ```
 
 ## Deploying
@@ -108,5 +178,12 @@ it.
 - Sessions are stateless JWTs; a logout on one device does not revoke other devices.
 - Rate limiting is in-process, so it counts per Node process. Move it to Redis if you run more
   than one instance.
-- Images are referenced by URL. There is no upload pipeline yet.
-- No SMS yet: phone numbers are stored and validated but not verified with an OTP.
+- No realtime transport. The tracking page, the board and the inbox poll on a short interval; the
+  code says so where it happens.
+- One-time codes are generated and verified, but no email or SMS provider is wired up, so the
+  request endpoint returns a delivery failure and the code is only visible in the server log.
+- Home service is modelled end to end and kept behind `FEATURE_HOME_SERVICE`, which is off. There
+  is no address book, no travel time and no delivery flow.
+- No reverse geocoding provider, so "use my location" sorts by distance but does not name the
+  place.
+- Refunds are modelled on the payment row but have no UI.

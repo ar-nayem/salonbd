@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import { getCurrentUser } from "@/lib/auth";
 import { getT } from "@/lib/i18n";
 import { DashboardNav } from "@/components/dashboard-nav";
+import { ScanFab } from "@/components/scan-fab";
 
 export const dynamic = "force-dynamic";
 
@@ -20,7 +21,8 @@ export default async function DashboardLayout({ children }: { children: React.Re
         </div>
         <DashboardNav />
       </aside>
-      <div className="min-w-0 flex-1">{children}</div>
+      <div className="min-w-0 flex-1 pb-24 md:pb-0">{children}</div>
+      <ScanFab />
     </div>
   );
 }

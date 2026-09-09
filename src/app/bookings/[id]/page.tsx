@@ -1,13 +1,17 @@
 import { notFound, redirect } from "next/navigation";
 import Link from "next/link";
-import { CheckCircle2, Clock, MapPin, Phone, User } from "lucide-react";
+import { Armchair, CheckCircle2, Clock, MapPin, Phone, User, UserRound } from "lucide-react";
 import { db } from "@/lib/db";
 import { getCurrentUser } from "@/lib/auth";
 import { getT } from "@/lib/i18n";
+import { CUSTOMER_CANCELLABLE } from "@/lib/status";
+import { ensureBookingQr } from "@/lib/qr";
 import { formatDateLabel, formatNumber, formatTaka, minToTime, nowMinutes, todayISO } from "@/lib/utils";
 import { Card } from "@/components/ui";
 import { PaymentBadge, StatusBadge } from "@/components/status-badge";
-import { CancelBooking, PayNow, ReviewForm } from "@/components/booking-actions";
+import { BookingTimeline } from "@/components/booking-timeline";
+import { MessageThread } from "@/components/message-thread";
+import { CancelBooking, ClaimAccount, PayNow, ReviewForm } from "@/components/booking-actions";
 
 export const dynamic = "force-dynamic";
 
@@ -27,18 +31,25 @@ export default async function BookingDetailPage({
   const booking = await db.booking.findUnique({
     where: { id },
     include: {
-      shop: { select: { name: true, nameBn: true, slug: true, address: true, area: true, city: true, phone: true } },
+      shop: {
+        select: { name: true, nameBn: true, slug: true, address: true, area: true, city: true, phone: true },
+      },
       staff: { select: { name: true } },
-      items: true,
+      station: { select: { name: true } },
+      items: { include: { options: true } },
+      events: { orderBy: { createdAt: "asc" }, select: { status: true, createdAt: true } },
       review: true,
     },
   });
   if (!booking || booking.customerId !== user.id) notFound();
 
+  const guest = await db.user.findUnique({ where: { id: user.id }, select: { isGuest: true } });
+  const qr = await ensureBookingQr(booking.id, booking.shopId);
+
   const outstanding = booking.total - booking.amountPaid;
   const started =
     booking.date < todayISO() || (booking.date === todayISO() && booking.startMin <= nowMinutes());
-  const canCancel = !started && (booking.status === "PENDING" || booking.status === "CONFIRMED");
+  const canCancel = CUSTOMER_CANCELLABLE.includes(booking.status) && !started;
   const canPay =
     outstanding > 0 &&
     booking.paymentMethod === "ONLINE" &&
@@ -59,17 +70,14 @@ export default async function BookingDetailPage({
 
       {sp.payment === "failed" ? (
         <Card className="border-red-200 bg-red-50 p-4 text-sm text-red-700 dark:bg-red-950/40 dark:text-red-200">
-          Payment failed or was cancelled. You can try again below.
+          Payment did not go through, so this booking is not confirmed yet. You can try again below.
         </Card>
       ) : null}
 
       <Card className="space-y-4 p-5">
         <div className="flex items-start justify-between gap-3">
           <div>
-            <Link
-              href={`/shops/${booking.shop.slug}`}
-              className="text-lg font-bold hover:underline"
-            >
+            <Link href={`/shops/${booking.shop.slug}`} className="text-lg font-bold hover:underline">
               {locale === "bn" && booking.shop.nameBn ? booking.shop.nameBn : booking.shop.name}
             </Link>
             <p className="muted flex items-center gap-1 text-sm">
@@ -79,23 +87,54 @@ export default async function BookingDetailPage({
           <StatusBadge status={booking.status} />
         </div>
 
-        <div className="rounded-2xl border border-dashed p-4 text-center">
-          <p className="muted text-xs uppercase tracking-wide">{t("bookings.code")}</p>
-          <p className="mt-1 text-3xl font-bold tracking-[0.2em]">{booking.code}</p>
+        <div className="flex flex-col items-center gap-3 rounded-2xl border border-dashed p-4 sm:flex-row sm:justify-between">
+          <div className="text-center sm:text-left">
+            <p className="muted text-xs uppercase tracking-wide">{t("bookings.code")}</p>
+            <p className="mt-1 text-3xl font-bold tracking-[0.2em]">{booking.code}</p>
+          </div>
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src={`/api/qr/${qr.token}/png?size=256`}
+            alt={`QR for booking ${booking.code}`}
+            className="h-28 w-28 rounded-xl bg-white p-1"
+          />
         </div>
 
         <div className="grid gap-3 sm:grid-cols-2">
-          <Info icon={<Clock size={15} />} label={t("common.date")} value={`${formatDateLabel(booking.date, locale)} · ${minToTime(booking.startMin, locale)} – ${minToTime(booking.endMin, locale)}`} />
+          <Info
+            icon={<Clock size={15} />}
+            label={t("common.date")}
+            value={`${formatDateLabel(booking.date, locale)} · ${minToTime(booking.startMin, locale)} – ${minToTime(booking.endMin, locale)}`}
+          />
           <Info icon={<User size={15} />} label={t("dash.staff")} value={booking.staff?.name ?? t("book.anyStaff")} />
+          {booking.station ? (
+            <Info icon={<Armchair size={15} />} label={t("book.chair")} value={booking.station.name} />
+          ) : null}
           <Info icon={<Phone size={15} />} label={t("book.yourPhone")} value={booking.customerPhone} />
-          <Info icon={<Phone size={15} />} label={t("shop.callShop")} value={booking.shop.phone} />
+          {booking.bookingFor === "OTHER" && booking.recipientName ? (
+            <Info
+              icon={<UserRound size={15} />}
+              label={t("book.forOther")}
+              value={`${booking.recipientName}${booking.recipientPhone ? ` · ${booking.recipientPhone}` : ""}`}
+            />
+          ) : null}
         </div>
+
+        {booking.recipientNote ? (
+          <p className="muted rounded-xl bg-black/[.03] p-3 text-sm dark:bg-white/[.05]">
+            {booking.recipientNote}
+          </p>
+        ) : null}
 
         <div className="space-y-1.5 border-t pt-3 text-sm">
           {booking.items.map((i) => (
-            <div key={i.id} className="flex justify-between">
-              <span>
-                {i.name} <span className="muted text-xs">· {formatNumber(i.durationMin, locale)} {t("book.min")}</span>
+            <div key={i.id} className="flex justify-between gap-3">
+              <span className="min-w-0">
+                {i.name}{" "}
+                <span className="muted text-xs">· {formatNumber(i.durationMin, locale)} {t("book.min")}</span>
+                {i.options.length > 0 ? (
+                  <span className="muted block text-xs">{i.options.map((o) => o.name).join(", ")}</span>
+                ) : null}
               </span>
               <span>{formatTaka(i.price, locale)}</span>
             </div>
@@ -124,19 +163,42 @@ export default async function BookingDetailPage({
         </div>
 
         {booking.notes ? (
-          <p className="muted rounded-xl bg-black/[.03] p-3 text-sm dark:bg-white/[.05]">
-            {booking.notes}
-          </p>
+          <p className="muted rounded-xl bg-black/[.03] p-3 text-sm dark:bg-white/[.05]">{booking.notes}</p>
         ) : null}
 
-        <div className="flex flex-wrap gap-2">
-          {canPay ? <PayNow bookingId={booking.id} label={`${t("book.deposit")} ${formatTaka(outstanding, locale)}`} /> : null}
+        <div className="flex flex-wrap items-center gap-2">
+          {canPay ? (
+            <PayNow bookingId={booking.id} label={`${t("book.deposit")} ${formatTaka(outstanding, locale)}`} />
+          ) : null}
+          <a
+            href={`tel:${booking.shop.phone}`}
+            className="inline-flex h-11 items-center gap-2 rounded-xl border px-4 text-sm font-medium"
+          >
+            <Phone size={16} /> {t("shop.callShop")}
+          </a>
           {canCancel ? <CancelBooking bookingId={booking.id} /> : null}
         </div>
       </Card>
 
+      <Card className="p-5">
+        <BookingTimeline
+          bookingId={booking.id}
+          status={booking.status}
+          fulfilment={booking.fulfilment}
+          events={booking.events.map((e) => ({ status: e.status, createdAt: e.createdAt.toISOString() }))}
+        />
+      </Card>
+
+      <MessageThread bookingId={booking.id} title={t("msg.messageShop")} />
+
+      {guest?.isGuest ? <ClaimAccount /> : null}
+
       {booking.status === "COMPLETED" && !booking.review ? (
-        <ReviewForm bookingId={booking.id} />
+        <ReviewForm
+          bookingId={booking.id}
+          items={booking.items.map((i) => ({ id: i.id, name: i.name }))}
+          staffName={booking.staff?.name ?? null}
+        />
       ) : null}
     </div>
   );

@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 import { Heart } from "lucide-react";
 import { db } from "@/lib/db";
+import { PUBLIC_SERVICE_WHERE } from "@/lib/constants";
 import { getCurrentUser } from "@/lib/auth";
 import { getT } from "@/lib/i18n";
 import { ShopCard } from "@/components/shop-card";
@@ -30,7 +31,7 @@ export default async function FavoritesPage() {
           reviewCount: true,
           isVerified: true,
           shopType: true,
-          services: { where: { isActive: true }, select: { price: true }, orderBy: { price: "asc" }, take: 1 },
+          services: { where: PUBLIC_SERVICE_WHERE, select: { price: true }, orderBy: { price: "asc" }, take: 1 },
         },
       },
     },

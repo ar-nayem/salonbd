@@ -1,17 +1,21 @@
 "use client";
 
+import type { BookingStatus } from "@prisma/client";
 import { Badge } from "./ui";
 import { useI18n } from "./locale-provider";
 
-const TONES = {
+const TONES: Record<BookingStatus, "neutral" | "green" | "amber" | "red" | "blue"> = {
   PENDING: "amber",
   CONFIRMED: "green",
-  COMPLETED: "blue",
+  ACCEPTED: "blue",
+  IN_PROGRESS: "blue",
+  READY: "blue",
+  COMPLETED: "green",
   CANCELLED: "red",
   NO_SHOW: "neutral",
-} as const;
+};
 
-export function StatusBadge({ status }: { status: keyof typeof TONES }) {
+export function StatusBadge({ status }: { status: BookingStatus }) {
   const { t } = useI18n();
   return <Badge tone={TONES[status]}>{t(`status.${status}`)}</Badge>;
 }

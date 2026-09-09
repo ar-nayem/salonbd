@@ -16,6 +16,7 @@ export type ShopCardData = {
   isVerified: boolean;
   shopType: string;
   minPrice?: number | null;
+  distanceLabel?: string | null;
 };
 
 export function ShopCard({ shop, locale }: { shop: ShopCardData; locale: string }) {
@@ -53,6 +54,7 @@ export function ShopCard({ shop, locale }: { shop: ShopCardData; locale: string 
         </div>
         <p className="muted flex items-center gap-1 text-xs">
           <MapPin size={12} /> {shop.area}, {shop.city}
+          {shop.distanceLabel ? <span>· {shop.distanceLabel}</span> : null}
         </p>
         <div className="mt-auto flex items-center justify-between pt-2">
           <span className="rounded-full bg-ink-100 px-2 py-0.5 text-[11px] dark:bg-ink-800">

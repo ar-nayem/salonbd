@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { Scissors, Sparkles, Clock, Wallet, Store, ArrowRight, MapPin } from "lucide-react";
 import { db } from "@/lib/db";
+import { PUBLIC_SERVICE_WHERE, PUBLIC_SHOP_WHERE } from "@/lib/constants";
 import { getT } from "@/lib/i18n";
 import { SearchBox } from "@/components/search-box";
 import { ShopCard } from "@/components/shop-card";
@@ -20,7 +21,7 @@ const CATEGORIES = [
 export default async function HomePage() {
   const { locale, t } = await getT();
 
-  const where = { isActive: true } as const;
+  const where = PUBLIC_SHOP_WHERE;
   const select = {
     id: true,
     slug: true,
@@ -33,7 +34,7 @@ export default async function HomePage() {
     reviewCount: true,
     isVerified: true,
     shopType: true,
-    services: { where: { isActive: true }, select: { price: true }, orderBy: { price: "asc" as const }, take: 1 },
+    services: { where: PUBLIC_SERVICE_WHERE, select: { price: true }, orderBy: { price: "asc" as const }, take: 1 },
   };
 
   const [popular, topRated, areas] = await Promise.all([

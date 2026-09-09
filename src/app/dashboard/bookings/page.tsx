@@ -1,11 +1,15 @@
 import { db } from "@/lib/db";
-import { requireOwnerShopId } from "@/lib/owner";
+import { requireShopPage } from "@/lib/tenancy";
 import { getT } from "@/lib/i18n";
-import { formatDateLabel, formatTaka, minToTime, todayISO } from "@/lib/utils";
+import { formatDateLabel, formatTaka, minToTime } from "@/lib/utils";
 import { Button, Card, EmptyState, Select } from "@/components/ui";
 import { PaymentBadge, StatusBadge } from "@/components/status-badge";
-import { setBookingStatus } from "../actions";
+import { AdvanceButton, CloseBookingButtons } from "@/components/advance-button";
+import { advanceBookingAction, closeBookingAction } from "../actions";
+import { isTerminal } from "@/lib/status";
 import type { Prisma } from "@prisma/client";
+import Link from "next/link";
+import { MessageSquare } from "lucide-react";
 
 export const dynamic = "force-dynamic";
 
@@ -15,7 +19,7 @@ export default async function DashboardBookings({
   searchParams: Promise<{ status?: string; date?: string }>;
 }) {
   const sp = await searchParams;
-  const { shopId } = await requireOwnerShopId();
+  const { shopId } = await requireShopPage();
   const { locale, t } = await getT();
 
   const where: Prisma.BookingWhereInput = {
@@ -28,7 +32,11 @@ export default async function DashboardBookings({
     where,
     orderBy: [{ date: "desc" }, { startMin: "desc" }],
     take: 100,
-    include: { staff: { select: { name: true } }, items: { select: { name: true } } },
+    include: {
+      staff: { select: { name: true } },
+      station: { select: { name: true } },
+      items: { select: { name: true } },
+    },
   });
 
   return (
@@ -40,7 +48,7 @@ export default async function DashboardBookings({
           <label className="muted mb-1 block text-xs">{t("common.status")}</label>
           <Select name="status" defaultValue={sp.status ?? "ALL"}>
             <option value="ALL">{t("common.all")}</option>
-            {["PENDING", "CONFIRMED", "COMPLETED", "CANCELLED", "NO_SHOW"].map((s) => (
+            {["PENDING", "CONFIRMED", "ACCEPTED", "IN_PROGRESS", "COMPLETED", "CANCELLED", "NO_SHOW"].map((s) => (
               <option key={s} value={s}>
                 {t(`status.${s}`)}
               </option>
@@ -73,10 +81,18 @@ export default async function DashboardBookings({
                     {b.customerName} · <span className="muted text-sm">{b.customerPhone}</span>
                   </p>
                   <p className="muted text-sm">
-                    {formatDateLabel(b.date, locale)} · {minToTime(b.startMin, locale)} – {minToTime(b.endMin, locale)}
+                    {formatDateLabel(b.date, locale)} · {minToTime(b.startMin, locale)} –{" "}
+                    {minToTime(b.endMin, locale)}
                     {b.staff ? ` · ${b.staff.name}` : ""}
+                    {b.station ? ` · ${b.station.name}` : ""}
                   </p>
                   <p className="muted text-xs">{b.items.map((i) => i.name).join(", ")}</p>
+                  {b.bookingFor === "OTHER" && b.recipientName ? (
+                    <p className="text-xs">
+                      {t("book.forOther")}: {b.recipientName}
+                      {b.recipientPhone ? ` · ${b.recipientPhone}` : ""}
+                    </p>
+                  ) : null}
                   {b.notes ? <p className="mt-1 text-xs italic">{b.notes}</p> : null}
                 </div>
                 <div className="space-y-1 text-right">
@@ -89,42 +105,29 @@ export default async function DashboardBookings({
                 </div>
               </div>
 
-              {b.status === "PENDING" || b.status === "CONFIRMED" ? (
-                <div className="flex flex-wrap gap-2">
-                  {b.status === "PENDING" ? (
-                    <StatusForm id={b.id} status="CONFIRMED" label={t("status.CONFIRMED")} />
-                  ) : null}
-                  <StatusForm id={b.id} status="COMPLETED" label={t("status.COMPLETED")} variant="dark" />
-                  <StatusForm id={b.id} status="NO_SHOW" label={t("status.NO_SHOW")} variant="outline" />
-                  <StatusForm id={b.id} status="CANCELLED" label={t("status.CANCELLED")} variant="outline" />
-                </div>
-              ) : null}
+              <div className="flex flex-wrap items-center gap-2">
+                {!isTerminal(b.status) ? (
+                  <>
+                    <AdvanceButton
+                      status={b.status}
+                      fulfilment={b.fulfilment}
+                      bookingId={b.id}
+                      action={advanceBookingAction}
+                    />
+                    <CloseBookingButtons bookingId={b.id} action={closeBookingAction} />
+                  </>
+                ) : null}
+                <Link
+                  href={`/dashboard/messages?booking=${b.id}`}
+                  className="inline-flex h-9 items-center gap-1.5 rounded-xl border px-3 text-sm"
+                >
+                  <MessageSquare size={14} /> {t("msg.messageCustomer")}
+                </Link>
+              </div>
             </Card>
           ))}
         </div>
       )}
     </div>
-  );
-}
-
-function StatusForm({
-  id,
-  status,
-  label,
-  variant = "primary",
-}: {
-  id: string;
-  status: string;
-  label: string;
-  variant?: "primary" | "outline" | "dark";
-}) {
-  return (
-    <form action={setBookingStatus}>
-      <input type="hidden" name="id" value={id} />
-      <input type="hidden" name="status" value={status} />
-      <Button size="sm" variant={variant} type="submit">
-        {label}
-      </Button>
-    </form>
   );
 }

@@ -1,13 +1,13 @@
 import { db } from "@/lib/db";
-import { requireOwnerShopId } from "@/lib/owner";
+import { requireShopPage } from "@/lib/tenancy";
 import { getT } from "@/lib/i18n";
 import { Button, Card, Input, Label, Select, Textarea } from "@/components/ui";
-import { addShopImage, deleteShopImage, updateShop } from "../actions";
+import { deleteShopImage, updateShop, uploadShopImage } from "../actions";
 
 export const dynamic = "force-dynamic";
 
 export default async function SettingsPage() {
-  const { shopId } = await requireOwnerShopId();
+  const { shopId } = await requireShopPage();
   const { t } = await getT();
 
   const shop = await db.shop.findUnique({
@@ -59,10 +59,7 @@ export default async function SettingsPage() {
             <Label>District</Label>
             <Input name="district" defaultValue={shop.district} />
           </div>
-          <div>
-            <Label>Cover image URL</Label>
-            <Input name="coverUrl" defaultValue={shop.coverUrl ?? ""} placeholder="https://..." />
-          </div>
+          <input type="hidden" name="coverUrl" value={shop.coverUrl ?? ""} />
           <div className="grid grid-cols-2 gap-3">
             <div>
               <Label>Latitude</Label>
@@ -128,12 +125,39 @@ export default async function SettingsPage() {
 
       <Card className="p-4">
         <p className="mb-3 font-medium">{t("shop.gallery")}</p>
-        <form action={addShopImage} className="flex flex-wrap gap-2">
-          <input type="hidden" name="shopId" value={shop.id} />
-          <Input name="url" placeholder="https://image-url" className="max-w-md flex-1" required />
-          <Input name="caption" placeholder="Caption" className="max-w-[12rem]" />
-          <Button type="submit">{t("common.add")}</Button>
-        </form>
+        <div className="space-y-3">
+          <form action={uploadShopImage} className="flex flex-wrap items-center gap-2">
+            <input type="hidden" name="shopId" value={shop.id} />
+            <input type="hidden" name="target" value="COVER" />
+            <input
+              type="file"
+              name="file"
+              accept="image/*"
+              required
+              className="text-xs file:mr-2 file:rounded-lg file:border file:px-3 file:py-1.5 file:text-xs"
+            />
+            <Button type="submit" variant="outline">
+              Upload cover
+            </Button>
+            {shop.coverUrl ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img src={shop.coverUrl} alt="" className="h-12 w-20 rounded-lg object-cover" />
+            ) : null}
+          </form>
+
+          <form action={uploadShopImage} className="flex flex-wrap items-center gap-2">
+            <input type="hidden" name="shopId" value={shop.id} />
+            <input
+              type="file"
+              name="file"
+              accept="image/*"
+              required
+              className="text-xs file:mr-2 file:rounded-lg file:border file:px-3 file:py-1.5 file:text-xs"
+            />
+            <Input name="caption" placeholder="Caption" className="max-w-[12rem]" />
+            <Button type="submit">{t("common.add")}</Button>
+          </form>
+        </div>
 
         <div className="mt-3 grid grid-cols-3 gap-2 md:grid-cols-6">
           {shop.images.map((img) => (

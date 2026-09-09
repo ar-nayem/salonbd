@@ -3,6 +3,7 @@ import Link from "next/link";
 import { MapPin, Phone, BadgeCheck, Clock, Scissors, MessageSquare } from "lucide-react";
 import type { Metadata } from "next";
 import { db } from "@/lib/db";
+import { PUBLIC_SERVICE_WHERE } from "@/lib/constants";
 import { getT } from "@/lib/i18n";
 import { getCurrentUser } from "@/lib/auth";
 import { isOpenNow } from "@/lib/availability";
@@ -11,6 +12,7 @@ import { Badge, Card, LinkButton, SectionTitle } from "@/components/ui";
 import { Rating, StarRow } from "@/components/rating";
 import { FavoriteButton } from "@/components/favorite-button";
 import { QueuePanel } from "@/components/queue-panel";
+import { HelpfulButton } from "@/components/booking-actions";
 
 export const dynamic = "force-dynamic";
 
@@ -39,7 +41,7 @@ export default async function ShopPage({ params }: { params: Promise<{ slug: str
   const shop = await db.shop.findUnique({
     where: { slug },
     include: {
-      services: { where: { isActive: true }, orderBy: [{ sort: "asc" }, { price: "asc" }] },
+      services: { where: PUBLIC_SERVICE_WHERE, orderBy: [{ sort: "asc" }, { price: "asc" }] },
       staff: { where: { isActive: true }, orderBy: { sort: "asc" } },
       hours: { orderBy: { weekday: "asc" } },
       images: { orderBy: { sort: "asc" } },
@@ -47,14 +49,20 @@ export default async function ShopPage({ params }: { params: Promise<{ slug: str
         where: { isHidden: false },
         orderBy: { createdAt: "desc" },
         take: 10,
-        include: { customer: { select: { name: true, avatarUrl: true } }, staff: { select: { name: true } } },
+        include: {
+          customer: { select: { id: true, name: true, avatarUrl: true } },
+          staff: { select: { name: true } },
+          photos: true,
+          tags: true,
+          _count: { select: { votes: true } },
+        },
       },
     },
   });
 
-  if (!shop || !shop.isActive) notFound();
+  if (!shop || shop.status !== "ACTIVE" || !shop.isActive) notFound();
 
-  const [favorite, queue] = await Promise.all([
+  const [favorite, queue, myVotes] = await Promise.all([
     user
       ? db.favorite.findUnique({ where: { userId_shopId: { userId: user.id, shopId: shop.id } } })
       : null,
@@ -65,7 +73,11 @@ export default async function ShopPage({ params }: { params: Promise<{ slug: str
           select: { number: true, status: true },
         })
       : [],
+    user
+      ? db.reviewVote.findMany({ where: { userId: user.id }, select: { reviewId: true } })
+      : Promise.resolve([]),
   ]);
+  const votedIds = new Set(myVotes.map((v) => v.reviewId));
 
   const name = locale === "bn" && shop.nameBn ? shop.nameBn : shop.name;
   const about = locale === "bn" && shop.aboutBn ? shop.aboutBn : shop.about;
@@ -265,6 +277,42 @@ export default async function ShopPage({ params }: { params: Promise<{ slug: str
                   </div>
                   {r.staff ? <p className="muted text-xs">{r.staff.name}</p> : null}
                   {r.comment ? <p className="mt-1 text-sm">{r.comment}</p> : null}
+
+                  {r.tags.length > 0 ? (
+                    <div className="mt-1.5 flex flex-wrap gap-1.5">
+                      {r.tags.map((tag) => (
+                        <span
+                          key={tag.id}
+                          className="rounded-full bg-black/[.05] px-2 py-0.5 text-[11px] dark:bg-white/[.08]"
+                        >
+                          {t(`tag.${tag.tag}`)}
+                        </span>
+                      ))}
+                    </div>
+                  ) : null}
+
+                  {r.photos.length > 0 ? (
+                    <div className="mt-2 flex gap-2">
+                      {r.photos.map((photo) => (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img
+                          key={photo.id}
+                          src={photo.url}
+                          alt=""
+                          className="h-16 w-16 rounded-lg object-cover"
+                          loading="lazy"
+                        />
+                      ))}
+                    </div>
+                  ) : null}
+                  <div className="mt-2">
+                    <HelpfulButton
+                      reviewId={r.id}
+                      initialCount={r._count.votes}
+                      initialVoted={votedIds.has(r.id)}
+                    />
+                  </div>
+
                   {r.reply ? (
                     <p className="muted mt-2 flex gap-2 rounded-xl bg-black/[.03] p-2 text-xs dark:bg-white/[.05]">
                       <MessageSquare size={13} className="mt-0.5 shrink-0" />

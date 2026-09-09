@@ -8,13 +8,17 @@ import { Button, Card, Input, Label } from "./ui";
 import { useI18n } from "./locale-provider";
 
 const ERRORS: Record<string, string> = {
-  INVALID_CREDENTIALS: "Wrong login or password.",
-  PHONE_TAKEN: "This mobile number already has an account.",
-  EMAIL_TAKEN: "This email already has an account.",
-  INVALID_PHONE: "Enter a valid Bangladeshi mobile number (01XXXXXXXXX).",
-  PHONE_OR_EMAIL_REQUIRED: "Give a mobile number or an email.",
-  TOO_MANY_REQUESTS: "Too many attempts. Try again later.",
-  BLOCKED: "This account is blocked.",
+  NOT_DELIVERED: "otp.notDelivered",
+  INVALID: "otp.invalid",
+  EXPIRED: "otp.expired",
+  LOCKED: "otp.locked",
+  INVALID_CREDENTIALS: "auth.wrongCredentials",
+  PHONE_TAKEN: "auth.phoneTaken",
+  EMAIL_TAKEN: "auth.emailTaken",
+  INVALID_PHONE: "auth.badPhone",
+  PHONE_OR_EMAIL_REQUIRED: "auth.needContact",
+  TOO_MANY_REQUESTS: "auth.tooMany",
+  BLOCKED: "auth.blocked",
 };
 
 export function AuthForm({
@@ -31,12 +35,55 @@ export function AuthForm({
   const [pending, start] = useTransition();
   const [error, setError] = useState("");
 
+  const [mode2, setMode2] = useState<"password" | "code">("password");
+  const [codeSent, setCodeSent] = useState(false);
+  const [code, setCode] = useState("");
+  const [notice, setNotice] = useState("");
   const [identifier, setIdentifier] = useState("");
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [isOwner, setIsOwner] = useState(false);
+
+  function requestCode(e: React.FormEvent) {
+    e.preventDefault();
+    setError("");
+    setNotice("");
+    start(async () => {
+      const res = await fetch("/api/auth/otp/request", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ destination: identifier }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setError(t(ERRORS[data.error] ?? "common.error"));
+        return;
+      }
+      setCodeSent(true);
+      setNotice(t("otp.sent"));
+    });
+  }
+
+  function verifyCode(e: React.FormEvent) {
+    e.preventDefault();
+    setError("");
+    start(async () => {
+      const res = await fetch("/api/auth/otp/verify", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ destination: identifier, code, name: name || undefined }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setError(t(ERRORS[data.error] ?? "common.error"));
+        return;
+      }
+      router.push(data.role === "OWNER" ? "/dashboard" : next);
+      router.refresh();
+    });
+  }
 
   function submit(e: React.FormEvent) {
     e.preventDefault();
@@ -55,7 +102,7 @@ export function AuthForm({
       });
       const data = await res.json();
       if (!res.ok) {
-        setError(ERRORS[data.error] ?? ERRORS[data.detail] ?? t("common.error"));
+        setError(t(ERRORS[data.error] ?? ERRORS[data.detail] ?? "common.error"));
         return;
       }
       router.push(data.role === "OWNER" ? "/dashboard" : next);
@@ -85,6 +132,50 @@ export function AuthForm({
         </>
       ) : null}
 
+      {mode2 === "code" ? (
+        <form onSubmit={codeSent ? verifyCode : requestCode} className="space-y-3">
+          <div>
+            <Label>{t("otp.destination")}</Label>
+            <Input
+              value={identifier}
+              onChange={(e) => setIdentifier(e.target.value)}
+              required
+              placeholder="01XXXXXXXXX"
+              disabled={codeSent}
+            />
+          </div>
+          {codeSent ? (
+            <div>
+              <Label>{t("otp.code")}</Label>
+              <Input
+                value={code}
+                onChange={(e) => setCode(e.target.value.replace(/\D/g, "").slice(0, 6))}
+                inputMode="numeric"
+                required
+                placeholder="000000"
+              />
+            </div>
+          ) : null}
+          {notice ? <p className="muted text-sm">{notice}</p> : null}
+          {error ? <p className="text-sm text-red-600">{error}</p> : null}
+          <Button type="submit" size="lg" className="w-full" disabled={pending}>
+            {pending ? <Loader2 size={16} className="animate-spin" /> : null}
+            {codeSent ? t("otp.verify") : t("otp.send")}
+          </Button>
+          <button
+            type="button"
+            className="muted w-full text-center text-sm"
+            onClick={() => {
+              setMode2("password");
+              setCodeSent(false);
+              setError("");
+              setNotice("");
+            }}
+          >
+            {t("otp.usePassword")}
+          </button>
+        </form>
+      ) : (
       <form onSubmit={submit} className="space-y-3">
         {mode === "signup" ? (
           <>
@@ -148,7 +239,18 @@ export function AuthForm({
           {pending ? <Loader2 size={16} className="animate-spin" /> : null}
           {mode === "login" ? t("auth.submitLogin") : t("auth.submitSignup")}
         </Button>
+        <button
+          type="button"
+          className="muted w-full text-center text-sm"
+          onClick={() => {
+            setMode2("code");
+            setError("");
+          }}
+        >
+          {t("otp.useCode")}
+        </button>
       </form>
+      )}
 
       <p className="muted text-center text-sm">
         {mode === "login" ? t("auth.noAccount") : t("auth.haveAccount")}{" "}

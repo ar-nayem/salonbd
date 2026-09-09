@@ -6,14 +6,18 @@ import { useState, useTransition } from "react";
 import { Scissors, Menu, X, Globe, LogOut, LayoutDashboard, ShieldCheck, CalendarDays, Heart, User as UserIcon } from "lucide-react";
 import { useI18n } from "./locale-provider";
 import type { Locale } from "@/lib/dictionaries";
+import type { Role } from "@prisma/client";
 import { Button, LinkButton } from "./ui";
 
 type HeaderUser = {
   id: string;
   name: string;
-  role: "CUSTOMER" | "OWNER" | "ADMIN";
+  role: Role;
   avatarUrl: string | null;
 } | null;
+
+const SHOP_ROLES: Role[] = ["OWNER", "STAFF"];
+const ADMIN_ROLES: Role[] = ["ADMIN", "SUPER_ADMIN"];
 
 export function SiteHeader({ user, locale }: { user: HeaderUser; locale: Locale }) {
   const { t } = useI18n();
@@ -59,12 +63,12 @@ export function SiteHeader({ user, locale }: { user: HeaderUser; locale: Locale 
               {t("nav.bookings")}
             </Link>
           ) : null}
-          {user?.role === "OWNER" ? (
+          {user && SHOP_ROLES.includes(user.role) ? (
             <Link href="/dashboard" className="rounded-lg px-3 py-2 hover:bg-black/[.04] dark:hover:bg-white/[.06]">
               {t("nav.dashboard")}
             </Link>
           ) : null}
-          {user?.role === "ADMIN" ? (
+          {user && ADMIN_ROLES.includes(user.role) ? (
             <Link href="/admin" className="rounded-lg px-3 py-2 hover:bg-black/[.04] dark:hover:bg-white/[.06]">
               {t("nav.admin")}
             </Link>
@@ -122,10 +126,10 @@ export function SiteHeader({ user, locale }: { user: HeaderUser; locale: Locale 
                 <MenuLink href="/bookings" icon={<CalendarDays size={16} />} label={t("nav.bookings")} onClick={() => setOpen(false)} />
                 <MenuLink href="/favorites" icon={<Heart size={16} />} label={t("nav.favorites")} onClick={() => setOpen(false)} />
                 <MenuLink href="/profile" icon={<UserIcon size={16} />} label={t("nav.profile")} onClick={() => setOpen(false)} />
-                {user.role === "OWNER" ? (
+                {SHOP_ROLES.includes(user.role) ? (
                   <MenuLink href="/dashboard" icon={<LayoutDashboard size={16} />} label={t("nav.dashboard")} onClick={() => setOpen(false)} />
                 ) : null}
-                {user.role === "ADMIN" ? (
+                {ADMIN_ROLES.includes(user.role) ? (
                   <MenuLink href="/admin" icon={<ShieldCheck size={16} />} label={t("nav.admin")} onClick={() => setOpen(false)} />
                 ) : null}
                 <button

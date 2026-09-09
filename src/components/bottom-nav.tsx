@@ -4,9 +4,10 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Home, Search, CalendarDays, LayoutDashboard, User } from "lucide-react";
 import { useI18n } from "./locale-provider";
+import type { Role } from "@prisma/client";
 import { cn } from "@/lib/utils";
 
-export function BottomNav({ role }: { role: "CUSTOMER" | "OWNER" | "ADMIN" | null }) {
+export function BottomNav({ role }: { role: Role | null }) {
   const pathname = usePathname();
   const { t } = useI18n();
 
@@ -14,8 +15,8 @@ export function BottomNav({ role }: { role: "CUSTOMER" | "OWNER" | "ADMIN" | nul
     { href: "/", icon: Home, label: t("nav.home") },
     { href: "/shops", icon: Search, label: t("nav.explore") },
     { href: "/bookings", icon: CalendarDays, label: t("nav.bookings") },
-    role === "OWNER" || role === "ADMIN"
-      ? { href: role === "ADMIN" ? "/admin" : "/dashboard", icon: LayoutDashboard, label: t("nav.dashboard") }
+    role === "OWNER" || role === "STAFF" || role === "ADMIN" || role === "SUPER_ADMIN"
+      ? { href: role === "ADMIN" || role === "SUPER_ADMIN" ? "/admin" : "/dashboard", icon: LayoutDashboard, label: t("nav.dashboard") }
       : { href: "/profile", icon: User, label: t("nav.account") },
   ];
 

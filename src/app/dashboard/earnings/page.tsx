@@ -1,5 +1,5 @@
 import { db } from "@/lib/db";
-import { requireOwnerShopId } from "@/lib/owner";
+import { requireShopPage } from "@/lib/tenancy";
 import { getT } from "@/lib/i18n";
 import { formatTaka, todayISO } from "@/lib/utils";
 import { Card } from "@/components/ui";
@@ -7,7 +7,7 @@ import { Card } from "@/components/ui";
 export const dynamic = "force-dynamic";
 
 export default async function EarningsPage() {
-  const { shopId } = await requireOwnerShopId();
+  const { shopId } = await requireShopPage();
   const { locale, t } = await getT();
 
   const today = todayISO();

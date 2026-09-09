@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { CalendarX2, Clock, MapPin } from "lucide-react";
+import type { BookingStatus } from "@prisma/client";
 import { db } from "@/lib/db";
 import { getCurrentUser } from "@/lib/auth";
 import { getT } from "@/lib/i18n";
@@ -69,7 +70,7 @@ type Row = {
   code: string;
   date: string;
   startMin: number;
-  status: "PENDING" | "CONFIRMED" | "COMPLETED" | "CANCELLED" | "NO_SHOW";
+  status: BookingStatus;
   total: number;
   shop: { name: string; nameBn: string | null; slug: string; area: string; city: string };
   staff: { name: string } | null;

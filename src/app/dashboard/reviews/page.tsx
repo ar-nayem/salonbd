@@ -1,5 +1,5 @@
 import { db } from "@/lib/db";
-import { requireOwnerShopId } from "@/lib/owner";
+import { requireShopPage } from "@/lib/tenancy";
 import { getT } from "@/lib/i18n";
 import { Button, Card, EmptyState, Textarea } from "@/components/ui";
 import { StarRow } from "@/components/rating";
@@ -8,7 +8,7 @@ import { replyToReview } from "../actions";
 export const dynamic = "force-dynamic";
 
 export default async function DashboardReviews() {
-  const { shopId } = await requireOwnerShopId();
+  const { shopId } = await requireShopPage();
   const { t } = await getT();
 
   const reviews = await db.review.findMany({

@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { db } from "@/lib/db";
-import { requireOwnerShopId } from "@/lib/owner";
+import { requireShopPage } from "@/lib/tenancy";
 import { getT } from "@/lib/i18n";
 import { addDaysISO, formatDateLabel, minToTime, todayISO } from "@/lib/utils";
 import { Card, EmptyState } from "@/components/ui";
@@ -13,7 +13,7 @@ export default async function CalendarPage({
   searchParams: Promise<{ date?: string }>;
 }) {
   const sp = await searchParams;
-  const { shopId } = await requireOwnerShopId();
+  const { shopId } = await requireShopPage();
   const { locale, t } = await getT();
   const date = sp.date && /^\d{4}-\d{2}-\d{2}$/.test(sp.date) ? sp.date : todayISO();
 

@@ -1,9 +1,13 @@
+import { Suspense } from "react";
+import { SearchX } from "lucide-react";
 import { db } from "@/lib/db";
+import { PUBLIC_SERVICE_WHERE, PUBLIC_SHOP_WHERE } from "@/lib/constants";
 import { getT } from "@/lib/i18n";
+import { FAR_AWAY_KM, formatDistance, haversineKm } from "@/lib/geo";
 import { ShopCard } from "@/components/shop-card";
 import { SearchBox } from "@/components/search-box";
-import { EmptyState, Select } from "@/components/ui";
-import { SearchX } from "lucide-react";
+import { LocationBar } from "@/components/location-bar";
+import { Card, EmptyState, LinkButton, Select } from "@/components/ui";
 import type { Prisma } from "@prisma/client";
 
 export const dynamic = "force-dynamic";
@@ -20,13 +24,16 @@ export default async function ShopsPage({ searchParams }: { searchParams: SP }) 
   const type = typeof sp.type === "string" ? sp.type : "";
   const category = typeof sp.category === "string" ? sp.category : "";
   const sort = typeof sp.sort === "string" ? sp.sort : "rating";
+  const lat = typeof sp.lat === "string" ? Number(sp.lat) : null;
+  const lng = typeof sp.lng === "string" ? Number(sp.lng) : null;
+  const hasFix = lat !== null && lng !== null && Number.isFinite(lat) && Number.isFinite(lng);
 
   const where: Prisma.ShopWhereInput = {
-    isActive: true,
+    ...PUBLIC_SHOP_WHERE,
     ...(area ? { area } : {}),
     ...(city ? { city } : {}),
     ...(type ? { shopType: type } : {}),
-    ...(category ? { services: { some: { category, isActive: true } } } : {}),
+    ...(category ? { services: { some: { category, ...PUBLIC_SERVICE_WHERE } } } : {}),
     ...(q
       ? {
           OR: [
@@ -35,7 +42,7 @@ export default async function ShopsPage({ searchParams }: { searchParams: SP }) 
             { area: { contains: q } },
             { city: { contains: q } },
             { address: { contains: q } },
-            { services: { some: { name: { contains: q }, isActive: true } } },
+            { services: { some: { name: { contains: q }, ...PUBLIC_SERVICE_WHERE } } },
           ],
         }
       : {}),
@@ -48,7 +55,7 @@ export default async function ShopsPage({ searchParams }: { searchParams: SP }) 
         ? [{ createdAt: "desc" }]
         : [{ ratingAvg: "desc" }, { reviewCount: "desc" }];
 
-  const [shops, areas, cities] = await Promise.all([
+  const [rows, areas, cities] = await Promise.all([
     db.shop.findMany({
       where,
       orderBy,
@@ -60,30 +67,64 @@ export default async function ShopsPage({ searchParams }: { searchParams: SP }) 
         nameBn: true,
         area: true,
         city: true,
+        lat: true,
+        lng: true,
         coverUrl: true,
         ratingAvg: true,
         reviewCount: true,
         isVerified: true,
         shopType: true,
         services: {
-          where: { isActive: true },
-          select: { price: true },
+          where: PUBLIC_SERVICE_WHERE,
+          select: { price: true, discountPrice: true },
           orderBy: { price: "asc" },
           take: 1,
         },
       },
     }),
-    db.shop.findMany({ where: { isActive: true }, distinct: ["area"], select: { area: true }, orderBy: { area: "asc" } }),
-    db.shop.findMany({ where: { isActive: true }, distinct: ["city"], select: { city: true }, orderBy: { city: "asc" } }),
+    db.shop.findMany({ where: PUBLIC_SHOP_WHERE, distinct: ["area"], select: { area: true }, orderBy: { area: "asc" } }),
+    db.shop.findMany({ where: PUBLIC_SHOP_WHERE, distinct: ["city"], select: { city: true }, orderBy: { city: "asc" } }),
   ]);
+
+  // Distance is informational. It never removes a shop from the results.
+  const withDistance = rows.map((shop) => ({
+    ...shop,
+    distanceKm:
+      hasFix && shop.lat !== null && shop.lng !== null
+        ? haversineKm({ lat: lat!, lng: lng! }, { lat: shop.lat, lng: shop.lng })
+        : null,
+  }));
+
+  const shops =
+    hasFix && sort === "near"
+      ? [...withDistance].sort(
+          (a, b) => (a.distanceKm ?? Number.MAX_VALUE) - (b.distanceKm ?? Number.MAX_VALUE),
+        )
+      : withDistance;
+
+  const nearest = shops.reduce<number | null>(
+    (min, s) => (s.distanceKm !== null && (min === null || s.distanceKm < min) ? s.distanceKm : min),
+    null,
+  );
+  const everythingFar = hasFix && nearest !== null && nearest > FAR_AWAY_KM;
 
   return (
     <div className="space-y-5">
       <SearchBox defaultValue={q} />
 
+      <Suspense fallback={null}>
+        <LocationBar areaLabel={area || city || null} />
+      </Suspense>
+
       <form className="card flex flex-wrap items-end gap-3 rounded-2xl p-3" method="GET">
         {q ? <input type="hidden" name="q" value={q} /> : null}
         {category ? <input type="hidden" name="category" value={category} /> : null}
+        {hasFix ? (
+          <>
+            <input type="hidden" name="lat" value={String(lat)} />
+            <input type="hidden" name="lng" value={String(lng)} />
+          </>
+        ) : null}
 
         <div className="min-w-[9rem] flex-1">
           <label className="muted mb-1 block text-xs">{t("search.area")}</label>
@@ -125,6 +166,7 @@ export default async function ShopsPage({ searchParams }: { searchParams: SP }) 
             <option value="rating">{t("search.sortRating")}</option>
             <option value="popular">{t("search.sortPopular")}</option>
             <option value="new">{t("search.sortNew")}</option>
+            {hasFix ? <option value="near">{t("loc.nearYou")}</option> : null}
           </Select>
         </div>
 
@@ -140,12 +182,31 @@ export default async function ShopsPage({ searchParams }: { searchParams: SP }) 
         {shops.length} {t("search.results")}
       </p>
 
+      {everythingFar ? (
+        <Card className="flex flex-wrap items-center gap-3 p-4 text-sm">
+          <span>
+            {t("loc.farAway")} {formatDistance(nearest!, locale)}.
+          </span>
+          <LinkButton href="/shops" size="sm" variant="outline">
+            {t("loc.searchElsewhere")}
+          </LinkButton>
+        </Card>
+      ) : null}
+
       {shops.length === 0 ? (
         <EmptyState icon={<SearchX size={28} />} title={t("search.noResults")} />
       ) : (
         <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
           {shops.map((s) => (
-            <ShopCard key={s.id} shop={{ ...s, minPrice: s.services[0]?.price ?? null }} locale={locale} />
+            <ShopCard
+              key={s.id}
+              shop={{
+                ...s,
+                minPrice: s.services[0]?.discountPrice ?? s.services[0]?.price ?? null,
+                distanceLabel: s.distanceKm !== null ? formatDistance(s.distanceKm, locale) : null,
+              }}
+              locale={locale}
+            />
           ))}
         </div>
       )}

@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { CalendarCheck, Clock, Star, Wallet } from "lucide-react";
 import { db } from "@/lib/db";
-import { requireOwnerShopId } from "@/lib/owner";
+import { requireShopPage } from "@/lib/tenancy";
 import { getT } from "@/lib/i18n";
 import { formatTaka, minToTime, todayISO } from "@/lib/utils";
 import { Card, EmptyState } from "@/components/ui";
@@ -10,7 +10,7 @@ import { StatusBadge } from "@/components/status-badge";
 export const dynamic = "force-dynamic";
 
 export default async function DashboardHome() {
-  const { shopId } = await requireOwnerShopId();
+  const { shopId } = await requireShopPage();
   const { locale, t } = await getT();
   const today = todayISO();
   const monthStart = today.slice(0, 8) + "01";

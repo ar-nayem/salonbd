@@ -18,6 +18,7 @@ async function updateProfile(formData: FormData) {
   const name = String(formData.get("name") ?? "").trim();
   const phoneRaw = String(formData.get("phone") ?? "").trim();
   const email = String(formData.get("email") ?? "").trim().toLowerCase();
+  const dob = String(formData.get("dateOfBirth") ?? "").trim();
 
   const phone = phoneRaw ? normalizePhone(phoneRaw) : null;
   if (phoneRaw && !phone) return;
@@ -28,6 +29,8 @@ async function updateProfile(formData: FormData) {
       name: name.length >= 2 ? name : user.name,
       phone,
       email: email || null,
+      // Self-reported and optional; demographics are never inferred elsewhere.
+      dateOfBirth: dob ? new Date(dob) : null,
     },
   });
   revalidatePath("/profile");
@@ -56,6 +59,12 @@ export default async function ProfilePage() {
   if (!user) redirect("/login?next=/profile");
   const { t } = await getT();
 
+  const profile = await db.user.findUnique({
+    where: { id: user.id },
+    select: { dateOfBirth: true },
+  });
+  const dob = profile?.dateOfBirth ? profile.dateOfBirth.toISOString().slice(0, 10) : "";
+
   return (
     <div className="mx-auto max-w-lg space-y-4">
       <h1 className="text-2xl font-bold tracking-tight">{t("nav.profile")}</h1>
@@ -73,6 +82,12 @@ export default async function ProfilePage() {
           <div>
             <Label>{t("auth.email")}</Label>
             <Input name="email" type="email" defaultValue={user.email ?? ""} />
+          </div>
+          <div>
+            <Label>
+              Date of birth <span className="muted">({t("common.optional")})</span>
+            </Label>
+            <Input name="dateOfBirth" type="date" defaultValue={dob ?? ""} />
           </div>
           <Button type="submit">{t("common.save")}</Button>
         </form>

@@ -1,5 +1,5 @@
 import { db } from "@/lib/db";
-import { requireOwnerShopId } from "@/lib/owner";
+import { requireShopPage } from "@/lib/tenancy";
 import { getT } from "@/lib/i18n";
 import { minToInput, todayISO } from "@/lib/utils";
 import { Button, Card, Input, Label, Select } from "@/components/ui";
@@ -10,7 +10,7 @@ export const dynamic = "force-dynamic";
 const DAYS = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
 
 export default async function HoursPage() {
-  const { shopId } = await requireOwnerShopId();
+  const { shopId } = await requireShopPage();
   const { t } = await getT();
 
   const [hours, staff, closures] = await Promise.all([

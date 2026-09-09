@@ -1,14 +1,17 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { redirect } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import { db } from "@/lib/db";
 import { getCurrentUser } from "@/lib/auth";
+import { isAdmin } from "@/lib/tenancy";
+import { notify } from "@/lib/notifications";
 
 async function requireAdmin() {
   const user = await getCurrentUser();
   if (!user) redirect("/login?next=/admin");
-  if (user.role !== "ADMIN") redirect("/");
+  // Checked against the admin roles explicitly, not merely "logged in".
+  if (!isAdmin(user.role)) notFound();
   return user;
 }
 
@@ -29,13 +32,36 @@ export async function setShopVerified(form: FormData) {
   revalidatePath("/admin/shops");
 }
 
-export async function setShopActive(form: FormData) {
+/** Moves a shop through the platform lifecycle and tells the owner why. */
+export async function setShopStatus(form: FormData) {
   await requireAdmin();
-  await db.shop.update({
-    where: { id: str(form, "id") },
-    data: { isActive: str(form, "value") === "true" },
+  const id = str(form, "id");
+  const status = str(form, "status");
+  if (!["PENDING", "ACTIVE", "SUSPENDED", "CLOSED"].includes(status)) return;
+
+  const shop = await db.shop.update({
+    where: { id },
+    data: { status: status as never, statusNote: str(form, "note") || null },
+    select: { ownerId: true, name: true },
   });
+
+  await notify.send({
+    userId: shop.ownerId,
+    type: "SHOP_STATUS",
+    title: `${shop.name} is now ${status.toLowerCase()}`,
+    body:
+      status === "ACTIVE"
+        ? "Your shop is live and can take bookings."
+        : status === "SUSPENDED"
+          ? "Your shop is suspended and hidden from customers."
+          : status === "CLOSED"
+            ? "Your shop is closed on SalonBD."
+            : "Your shop is waiting for approval.",
+    href: "/dashboard",
+  });
+
   revalidatePath("/admin/shops");
+  revalidatePath("/shops");
 }
 
 export async function setShopCommission(form: FormData) {
@@ -61,7 +87,7 @@ export async function setUserRole(form: FormData) {
   const id = str(form, "id");
   const role = str(form, "role");
   if (id === admin.id) return;
-  if (!["CUSTOMER", "OWNER", "ADMIN"].includes(role)) return;
+  if (!["CUSTOMER", "STAFF", "OWNER", "ADMIN", "SUPER_ADMIN"].includes(role)) return;
   await db.user.update({ where: { id }, data: { role: role as never } });
   revalidatePath("/admin/users");
 }
