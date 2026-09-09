@@ -187,3 +187,23 @@ it.
 - No reverse geocoding provider, so "use my location" sorts by distance but does not name the
   place.
 - Refunds are modelled on the payment row but have no UI.
+
+## Production
+
+Live at https://salon.arnayem.top (Vultr box, nginx → pm2 `salonbd` on port 7700,
+`/var/www/salonbd`).
+
+```bash
+cd /var/www/salonbd
+git pull
+pm2 stop salonbd
+npm ci
+node node_modules/.bin/prisma db push
+npm run build > /tmp/salonbd-build.log 2>&1; echo "EXIT=$?"
+test -f .next/BUILD_ID && pm2 restart salonbd
+```
+
+Stop before building: a build while pm2 is serving can corrupt live requests, and a failed build
+destroys the previous `.next` with nothing to roll back to — check `BUILD_ID` exists before
+restarting. The build script pins `--max-old-space-size=1400` because `next build` outgrows the
+950MB box otherwise and V8 aborts mid-build.
