@@ -7,6 +7,8 @@ import { getT } from "@/lib/i18n";
 import { normalizePhone } from "@/lib/utils";
 import { Button, Card, Input, Label } from "@/components/ui";
 import { LogoutButton } from "@/components/logout-button";
+import { ReminderToggle } from "@/components/reminder-toggle";
+import { CalendarSyncCard } from "@/components/calendar-sync";
 
 export const dynamic = "force-dynamic";
 
@@ -103,6 +105,9 @@ export default async function ProfilePage() {
           </Button>
         </form>
       </Card>
+
+      <ReminderToggle />
+      <CalendarSyncCard />
 
       <LogoutButton label={t("nav.logout")} />
     </div>

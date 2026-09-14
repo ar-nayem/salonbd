@@ -33,6 +33,8 @@ model User {
   isGuest      Boolean  @default(false)
   dateOfBirth  DateTime?
   gender       String?
+  /// Secret for the personal calendar feed. Rotating it breaks old subscriptions on purpose.
+  calendarToken String? @unique
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 
@@ -48,6 +50,7 @@ model User {
   messages      Message[]
   uploads       UploadedFile[]
   qrScans       QrScan[]
+  pushSubscriptions PushSubscription[]
 }
 
 /// One-time login codes. Only the hash is stored.
@@ -387,6 +390,7 @@ model Booking {
   review       Review?
   conversation Conversation?
   qrCodes      QrCode[]
+  reminders    BookingReminder[]
 
   @@index([shopId, date])
   @@index([staffId, date])
@@ -740,4 +744,35 @@ model Payout {
 model Setting {
   key   String @id
   value String
+}
+
+// ---------------- Reminders ----------------
+
+/// A browser's Web Push endpoint. One person can have several (phone, laptop).
+model PushSubscription {
+  id         String    @id @default(cuid())
+  userId     String
+  user       User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  endpoint   String    @unique
+  p256dh     String
+  auth       String
+  userAgent  String?
+  failures   Int       @default(0)
+  lastUsedAt DateTime?
+  createdAt  DateTime  @default(now())
+
+  @@index([userId])
+}
+
+/// One row per reminder actually claimed for a booking. The unique pair is
+/// what stops two overlapping cron runs from reminding someone twice.
+model BookingReminder {
+  id        String   @id @default(cuid())
+  bookingId String
+  booking   Booking  @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+  kind      String   // DAY_BEFORE | HOUR_BEFORE
+  channels  String   @default("")
+  sentAt    DateTime @default(now())
+
+  @@unique([bookingId, kind])
 }

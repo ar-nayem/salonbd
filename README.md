@@ -83,6 +83,33 @@ Per shop, the owner chooses cash, online, or both, and an advance deposit percen
 full amount online). The remainder shows as "due at shop" and is settled when the shop marks the
 booking completed.
 
+## Calendar and reminders
+
+A website cannot write into a phone's calendar on its own — both iOS and Android require one tap.
+So a booking reaches the phone three ways:
+
+- **Add to calendar** on the booking page: a signed `.ics` link (Apple Calendar honours its two
+  alarms, 1 day and 1 hour before) and a Google Calendar link (Google applies its own default alert
+  and ignores alarms in imported events). The button order follows the device.
+- **Calendar subscription**: a personal `webcal://` feed behind a rotatable secret token. Subscribe
+  once and every later booking appears on its own; a cancellation arrives as `STATUS:CANCELLED` on
+  the same UID with a higher SEQUENCE, so the event updates instead of duplicating. Google polls
+  subscriptions every few hours; Apple honours the one-hour refresh hint.
+- **Server reminders**, because calendar alarms depend on the calendar app: `/api/cron/reminders`
+  runs every 5 minutes and sends a day-before and an hour-before reminder to the in-app inbox and by
+  Web Push. Each (booking, kind) is claimed with a unique row before sending, so overlapping runs
+  never remind twice. A booking made inside a window skips that window. Email and SMS go out
+  through the same run once a real provider is wired in.
+
+Web Push on iPhone works only after the site is added to the Home Screen (iOS 16.4+); the reminder
+card says so on iOS Safari. On Android, Chrome delivers through Google's push service.
+
+Production cron (root crontab):
+
+```
+*/5 * * * * curl -fsS -m 60 -H "Authorization: Bearer $CRON_SECRET" http://127.0.0.1:7700/api/cron/reminders > /dev/null
+```
+
 ## Decisions worth knowing
 
 **QR codes carry a token, nothing else.** A printed code encodes only `/q/<token>` with an

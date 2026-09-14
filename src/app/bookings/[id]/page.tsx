@@ -12,6 +12,11 @@ import { PaymentBadge, StatusBadge } from "@/components/status-badge";
 import { BookingTimeline } from "@/components/booking-timeline";
 import { MessageThread } from "@/components/message-thread";
 import { CancelBooking, ClaimAccount, PayNow, ReviewForm } from "@/components/booking-actions";
+import { AddToCalendar } from "@/components/add-to-calendar";
+import { ReminderToggle } from "@/components/reminder-toggle";
+import { CalendarSyncCard } from "@/components/calendar-sync";
+import { googleCalendarUrl, signBooking } from "@/lib/ics";
+import { CALENDAR_INCLUDE, toCalendarBooking } from "@/lib/calendar";
 
 export const dynamic = "force-dynamic";
 
@@ -46,6 +51,13 @@ export default async function BookingDetailPage({
   const guest = await db.user.findUnique({ where: { id: user.id }, select: { isGuest: true } });
   const qr = await ensureBookingQr(booking.id, booking.shopId);
 
+  const upcoming = !["CANCELLED", "NO_SHOW", "COMPLETED"].includes(booking.status);
+  const calendarBooking = upcoming
+    ? await db.booking.findUnique({ where: { id: booking.id }, include: CALENDAR_INCLUDE })
+    : null;
+  const icsUrl = `/api/bookings/${booking.id}/ics?sig=${signBooking(booking.id)}&lang=${locale}`;
+  const googleUrl = calendarBooking ? googleCalendarUrl(toCalendarBooking(calendarBooking), locale) : "";
+
   const outstanding = booking.total - booking.amountPaid;
   const started =
     booking.date < todayISO() || (booking.date === todayISO() && booking.startMin <= nowMinutes());
@@ -66,6 +78,13 @@ export default async function BookingDetailPage({
             <p className="muted text-sm">{t("book.successBody")}</p>
           </div>
         </Card>
+      ) : null}
+
+      {sp.new && calendarBooking ? (
+        <>
+          <AddToCalendar icsUrl={icsUrl} googleUrl={googleUrl} highlight />
+          <ReminderToggle compact />
+        </>
       ) : null}
 
       {sp.payment === "failed" ? (
@@ -180,6 +199,13 @@ export default async function BookingDetailPage({
         </div>
       </Card>
 
+      {!sp.new && calendarBooking ? (
+        <>
+          <AddToCalendar icsUrl={icsUrl} googleUrl={googleUrl} />
+          <ReminderToggle compact />
+        </>
+      ) : null}
+
       <Card className="p-5">
         <BookingTimeline
           bookingId={booking.id}
@@ -190,6 +216,8 @@ export default async function BookingDetailPage({
       </Card>
 
       <MessageThread bookingId={booking.id} title={t("msg.messageShop")} />
+
+      {upcoming ? <CalendarSyncCard /> : null}
 
       {guest?.isGuest ? <ClaimAccount /> : null}
 

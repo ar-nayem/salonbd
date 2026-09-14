@@ -44,6 +44,8 @@ next-env.d.ts
 # database
 prisma/*.db
 prisma/*.db-journal
+# backups taken before schema pushes (they hold real rows)
+prisma/*.db.bak*
 
 !.env.example
 

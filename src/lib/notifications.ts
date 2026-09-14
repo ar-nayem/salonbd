@@ -1,5 +1,6 @@
 import "server-only";
 import { db } from "./db";
+import { pushToUser } from "./push";
 
 /**
  * Every outbound channel sits behind one of these interfaces. Swapping a
@@ -67,7 +68,10 @@ export interface NotificationService {
   sendMany(inputs: NotificationInput[]): Promise<void>;
 }
 
-/** Writes to the in-app inbox. Push/SMS fan-out plugs in here later. */
+/**
+ * Writes to the in-app inbox, then fans out to the person's phone by web push.
+ * Push is best-effort and never blocks or fails the request that caused it.
+ */
 const dbNotifications: NotificationService = {
   async send(input) {
     await db.notification.create({
@@ -79,6 +83,12 @@ const dbNotifications: NotificationService = {
         href: input.href ?? null,
       },
     });
+    void pushToUser(input.userId, {
+      title: input.title,
+      body: input.body,
+      url: input.href ?? "/bookings",
+      tag: input.type,
+    }).catch((err) => console.error("[notify] push fan-out failed", err));
   },
   async sendMany(inputs) {
     if (inputs.length === 0) return;
