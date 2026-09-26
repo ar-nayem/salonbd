@@ -32,7 +32,6 @@ model User {
   // account later by setting a password.
   isGuest      Boolean  @default(false)
   dateOfBirth  DateTime?
-  gender       String?
   /// Secret for the personal calendar feed. Rotating it breaks old subscriptions on purpose.
   calendarToken String? @unique
   createdAt    DateTime @default(now())

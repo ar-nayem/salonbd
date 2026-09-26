@@ -47,9 +47,12 @@ export function LocationBar({ areaLabel }: { areaLabel?: string | null }) {
     setState("locating");
     navigator.geolocation.getCurrentPosition(
       (position) => {
+        // 3 decimal places is roughly 100 metres — enough to sort shops by
+        // distance, and it keeps a precise home address out of the URL and the
+        // web server's access log.
         const fix = {
-          lat: Number(position.coords.latitude.toFixed(5)),
-          lng: Number(position.coords.longitude.toFixed(5)),
+          lat: Number(position.coords.latitude.toFixed(3)),
+          lng: Number(position.coords.longitude.toFixed(3)),
           at: Date.now(),
         };
         try {

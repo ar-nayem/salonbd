@@ -126,6 +126,7 @@ export function SiteHeader({ user, locale }: { user: HeaderUser; locale: Locale 
                 <MenuLink href="/bookings" icon={<CalendarDays size={16} />} label={t("nav.bookings")} onClick={() => setOpen(false)} />
                 <MenuLink href="/favorites" icon={<Heart size={16} />} label={t("nav.favorites")} onClick={() => setOpen(false)} />
                 <MenuLink href="/profile" icon={<UserIcon size={16} />} label={t("nav.profile")} onClick={() => setOpen(false)} />
+                <MenuLink href="/privacy" icon={<ShieldCheck size={16} />} label={t("legal.privacy")} onClick={() => setOpen(false)} />
                 {SHOP_ROLES.includes(user.role) ? (
                   <MenuLink href="/dashboard" icon={<LayoutDashboard size={16} />} label={t("nav.dashboard")} onClick={() => setOpen(false)} />
                 ) : null}
@@ -146,6 +147,7 @@ export function SiteHeader({ user, locale }: { user: HeaderUser; locale: Locale 
                 <MenuLink href="/login" label={t("nav.login")} onClick={() => setOpen(false)} />
                 <MenuLink href="/signup" label={t("nav.signup")} onClick={() => setOpen(false)} />
                 <MenuLink href="/for-owners" label={t("nav.listShop")} onClick={() => setOpen(false)} />
+                <MenuLink href="/privacy" label={t("legal.privacy")} onClick={() => setOpen(false)} />
               </>
             )}
           </div>

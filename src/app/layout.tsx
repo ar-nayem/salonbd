@@ -6,6 +6,7 @@ import { getDict } from "@/lib/i18n";
 import { LocaleProvider } from "@/components/locale-provider";
 import { SiteHeader } from "@/components/site-header";
 import { BottomNav } from "@/components/bottom-nav";
+import { SiteFooter } from "@/components/site-footer";
 import { getCurrentUser } from "@/lib/auth";
 import { RegisterSW } from "@/components/register-sw";
 
@@ -45,7 +46,10 @@ export default async function RootLayout({ children }: { children: React.ReactNo
       <body className={locale === "bn" ? "font-bn antialiased" : "font-sans antialiased"}>
         <LocaleProvider locale={locale} dict={dict}>
           <SiteHeader user={user} locale={locale} />
-          <main className="mx-auto w-full max-w-6xl px-4 pb-28 pt-4 md:pb-16">{children}</main>
+          <main className="mx-auto w-full max-w-6xl px-4 pt-4">{children}</main>
+          <div className="pb-28 md:pb-10">
+            <SiteFooter />
+          </div>
           <BottomNav role={user?.role ?? null} />
           <RegisterSW />
         </LocaleProvider>

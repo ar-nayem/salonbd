@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { LogOut } from "lucide-react";
@@ -110,6 +111,12 @@ export default async function ProfilePage() {
       <CalendarSyncCard />
 
       <LogoutButton label={t("nav.logout")} />
+
+      <p className="text-center text-sm">
+        <Link href="/account/delete" className="text-red-600 underline underline-offset-2">
+          {t("legal.deleteAccount")}
+        </Link>
+      </p>
     </div>
   );
 }
