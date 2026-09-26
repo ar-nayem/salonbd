@@ -51,3 +51,8 @@ prisma/*.db.bak*
 
 # uploaded files
 storage/
+
+# Android wrapper: generated Gradle project and build outputs
+android/*
+!android/twa-manifest.json
+!android/README.md

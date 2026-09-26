@@ -1,0 +1,53 @@
+{
+  "packageId": "top.arnayem.salon",
+  "host": "salon.arnayem.top",
+  "name": "SalonBD — Barber & Salon Booking",
+  "launcherName": "SalonBD",
+  "display": "standalone",
+  "orientation": "portrait",
+  "themeColor": "#12835F",
+  "themeColorDark": "#0C1219",
+  "navigationColor": "#12835F",
+  "navigationColorDark": "#0C1219",
+  "navigationDividerColor": "#12835F",
+  "navigationDividerColorDark": "#0C1219",
+  "backgroundColor": "#F7F8F9",
+  "enableNotifications": true,
+  "startUrl": "/",
+  "iconUrl": "https://salon.arnayem.top/icons/icon-512.png",
+  "maskableIconUrl": "https://salon.arnayem.top/icons/maskable-512.png",
+  "splashScreenFadeOutDuration": 300,
+  "signingKey": {
+    "path": "/Users/apple/Desktop/salonbd-android/upload-keystore.jks",
+    "alias": "salonbd-upload"
+  },
+  "appVersionName": "1.0.0",
+  "appVersionCode": 1,
+  "shortcuts": [
+    {
+      "name": "Explore shops",
+      "shortName": "Shops",
+      "url": "https://salon.arnayem.top/shops",
+      "chosenIconUrl": "https://salon.arnayem.top/icons/icon-192.png"
+    },
+    {
+      "name": "My bookings",
+      "shortName": "Bookings",
+      "url": "https://salon.arnayem.top/bookings",
+      "chosenIconUrl": "https://salon.arnayem.top/icons/icon-192.png"
+    }
+  ],
+  "generatorApp": "bubblewrap-cli",
+  "webManifestUrl": "https://salon.arnayem.top/manifest.webmanifest",
+  "fallbackType": "customtabs",
+  "features": {},
+  "alphaDependencies": {
+    "enabled": false
+  },
+  "enableSiteSettingsShortcut": true,
+  "isChromeOSOnly": false,
+  "isMetaQuest": false,
+  "fullScopeUrl": "https://salon.arnayem.top/",
+  "minSdkVersion": 23,
+  "appVersion": "1.0.0"
+}
